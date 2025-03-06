@@ -2,10 +2,11 @@
 
 set -euo pipefail
 
-# TODO: Ensure this is the correct GitHub homepage where releases can be downloaded for docker-buildx.
 GH_REPO="https://github.com/rmgpinto/asdf-docker-buildx"
-TOOL_NAME="docker-buildx"
-TOOL_TEST="docker buildx version"
+TOOL_NAME="docker buildx"
+TOOL_TEST="docker buildx ls"
+OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
+ARCH="$(uname -m | sed 's/arm/aarch/')"
 
 fail() {
 	echo -e "asdf-$TOOL_NAME: $*"
@@ -31,8 +32,6 @@ list_github_tags() {
 }
 
 list_all_versions() {
-	# TODO: Adapt this. By default we simply list the tag names from GitHub releases.
-	# Change this function if docker-buildx has other means of determining installable versions.
 	list_github_tags
 }
 
@@ -41,8 +40,7 @@ download_release() {
 	version="$1"
 	filename="$2"
 
-	# TODO: Adapt the release URL convention for docker-buildx
-	url="$GH_REPO/archive/v${version}.tar.gz"
+	url="$GH_REPO/releases/download/v${version}/${TOOL_NAME}-${OS}-${ARCH}"
 
 	echo "* Downloading $TOOL_NAME release $version..."
 	curl "${curl_opts[@]}" -o "$filename" -C - "$url" || fail "Could not download $url"
@@ -61,7 +59,6 @@ install_version() {
 		mkdir -p "$install_path"
 		cp -r "$ASDF_DOWNLOAD_PATH"/* "$install_path"
 
-		# TODO: Assert docker-buildx executable exists.
 		local tool_cmd
 		tool_cmd="$(echo "$TOOL_TEST" | cut -d' ' -f1)"
 		test -x "$install_path/$tool_cmd" || fail "Expected $install_path/$tool_cmd to be executable."
@@ -70,5 +67,11 @@ install_version() {
 	) || (
 		rm -rf "$install_path"
 		fail "An error occurred while installing $TOOL_NAME $version."
+
+		if [ -f "${HOME}/.docker/cli-plugins/docker-buildx" ]; then
+			rm "${HOME}/.docker/cli-plugins/docker-buildx"
+		fi
+		mkdir -p "${HOME}/.docker/cli-plugins"
+		ln -s "$install_path/$TOOL_NAME" "${HOME}/.docker/cli-plugins/docker-buildx"
 	)
 }
